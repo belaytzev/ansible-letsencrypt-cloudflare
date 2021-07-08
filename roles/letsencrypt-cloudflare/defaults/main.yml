@@ -1,0 +1,8 @@
+---
+lego_path: "/opt/lego"
+lego_bin_path: "/opt/lego/lego"
+lego_certs_path: /opt/lego
+lego_version: 4.4.0
+lego_domain: "null"
+lego_email: user@examle.com
+cloudflare_token: <secret token>

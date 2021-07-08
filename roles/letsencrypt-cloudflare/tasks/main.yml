@@ -1,0 +1,60 @@
+---
+- name: Create folders for lego
+  ansible.builtin.file:
+    path: '{{ item }}'
+    recurse: yes
+    state: directory
+    mode: '0755'
+  with_items:
+    - '{{ lego_path }}'
+    - '{{ lego_certs_path }}'
+  become: true
+  when: lego_domain != 'null'
+
+- name: Install lego tool (https://github.com/go-acme/lego)
+  ansible.builtin.unarchive:
+    src: "https://github.com/go-acme/lego/releases/download/v{{ lego_version }}/lego_v{{ lego_version }}_linux_amd64.tar.gz"
+    dest: '{{ lego_path }}'
+    mode: '0655'
+    remote_src: yes
+  become: yes
+  when: lego_domain != 'null'
+
+- name: Copy cloudflare token
+  ansible.builtin.template:
+    src: 'cloudflare-token.j2'
+    dest: '/root/.cloudflare'
+    mode: '0600'
+  become: true
+  when: lego_domain != 'null'
+
+- name: Create Let's Encrypt certificates
+  environment:
+    CF_DNS_API_TOKEN_FILE: "/root/.cloudflare"
+  ansible.builtin.shell: |
+    {{ lego_bin_path }} \
+    --dns cloudflare \
+    --accept-tos \
+    --domains {{ lego_domain }} \
+    --email {{ lego_email }} \
+    --path {{ lego_certs_path }} \
+    run
+  become: true
+  when: lego_domain != 'null'
+
+- name: Set permissions to read for Let's Encrypt certificates
+  ansible.builtin.file:
+    path: '{{ lego_certs_path }}/certificates'
+    recurse: yes
+    mode: '0644'
+  become: true
+  when: lego_domain != 'null'
+
+- name: Add cron task for renew Let's Encrypt certificates
+  ansible.builtin.cron:
+    name: "Let's Encrypt certificates renew"
+    minute: "0"
+    hour: "0"
+    job: "{{ lego_bin_path }} --dns --accept-tos --domains {{ lego_domain }} --email {{ lego_email }} --path {{ lego_certs_path }} renew"
+  become: true
+  when: lego_domain != 'null'
